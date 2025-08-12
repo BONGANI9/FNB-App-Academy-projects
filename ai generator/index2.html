@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #000000 0%, #b1afb3 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #000000, #dfd1ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        
+        .mode-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: #f0f0f0;
+            color: #666;
+        }
+        
+        .mode-btn.active {
+            background: linear-gradient(45deg, #000000, #ffffff);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .input-section {
+            margin-bottom: 20px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            min-height: 120px;
+            transition: all 0.3s ease;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .generate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(45deg, #000000, #dfd4eb);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .output-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            min-height: 200px;
+        }
+        
+        .output-content {
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Courier New', monospace;
+            line-height: 1.6;
+        }
+        
+        .image-output {
+            text-align: center;
+        }
+        
+        .image-placeholder {
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            margin: 20px auto;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖CapGen</h1>
+        
+        <div class="mode-selector">
+            <button class="mode-btn active" data-mode="text">📝 Text</button>
+            <button class="mode-btn" data-mode="image">🎨 Image</button>
+            <button class="mode-btn" data-mode="code">💻 Code</button>
+        </div>
+        
+        <div class="input-section">
+            <textarea id="userInput" placeholder="Enter your request here..."></textarea>
+            <div id="apiKeySection" style="margin-top: 10px; display: none;">
+                <input type="password" id="apiKey" placeholder="Enter Hugging Face API Key (optional)" 
+                       style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 5px;">
+                <small style="color: #666;">Get free API key from <a href="https://huggingface.co" target="_blank">huggingface.co</a></small>
+            </div>
+        </div>
+        
+        <button class="generate-btn" onclick="generateContent()">
+            <span id="btnText">Generate Content</span>
+        </button>
+        
+        <div class="output-section">
+            <div id="output" class="output-content">Your generated content will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'text';
+        
+        // Mode selection
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentMode = e.target.dataset.mode;
+                updatePlaceholder();
+            });
+        });
+        
+        function updatePlaceholder() {
+            const input = document.getElementById('userInput');
+            const apiKeySection = document.getElementById('apiKeySection');
+            const placeholders = {
+                text: 'Enter your text generation request... (e.g., "Write a short story about space exploration")',
+                image: 'Describe the image you want to generate... (e.g., "A futuristic city at sunset")',
+                code: 'Describe the code you need... (e.g., "Create a JavaScript function to sort an array")'
+            };
+            input.placeholder = placeholders[currentMode];
+            
+            // Show API key input for image mode
+            apiKeySection.style.display = currentMode === 'image' ? 'block' : 'none';
+        }
+        
+        function generateContent() {
+            const input = document.getElementById('userInput').value.trim();
+            const output = document.getElementById('output');
+            const btnText = document.getElementById('btnText');
+            
+            if (!input) {
+                alert('Please enter a request first!');
+                return;
+            }
+            
+            // Show loading state
+            btnText.innerHTML = '<span class="loading"></span>Generating...';
+            document.querySelector('.generate-btn').disabled = true;
+            
+            // Simulate AI generation with realistic delay
+            setTimeout(() => {
+                switch(currentMode) {
+                    case 'text':
+                        generateText(input, output);
+                        break;
+                    case 'image':
+                        generateImage(input, output);
+                        break;
+                    case 'code':
+                        generateCode(input, output);
+                        break;
+                }
+                
+                // Reset button
+                btnText.innerHTML = 'Generate Content';
+                document.querySelector('.generate-btn').disabled = false;
+            }, 2000);
+        }
+        
+        
+        async function generateImage(prompt, output) {
+            try {
+                // Option 1: Pollinations AI (Free, no API key needed)
+                const imageUrl = await generateWithPollinations(prompt);
+                
+                output.innerHTML = `
+                    <div class="image-output">
+                        <h3>Generated Image: "${prompt}"</h3>
+                        <img src="${imageUrl}" alt="Generated image" style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+                        <p style="margin-top: 10px; color: #666;"><em>Generated using Pollinations AI</em></p>
+                    </div>
+                `;
+            } catch (error) {
+                // Fallback to other free APIs
+                try {
+                    const fallbackUrl = generateWithPicsum(prompt);
+                    output.innerHTML = `
+                        <div class="image-output">
+                            <h3>Image for: "${prompt}"</h3>
+                            <img src="${fallbackUrl}" alt="Placeholder image" style="max-width: 100%; height: auto; border-radius: 10px;">
+                            <p><em>Using Picsum as fallback (random photo)</em></p>
+                        </div>
+                    `;
+                } catch (fallbackError) {
+                    output.innerHTML = `
+                        <div class="image-output">
+                            <p style="color: #e74c3c;">❌ Error generating image. Please try again.</p>
+                            <p style="color: #666; font-size: 14px;">Error: ${error.message}</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+        // You can use multiple APIs as fallbacks
+        const apiProviders = {
+        primary: 'groq',
+        fallback: 'huggingface'
+        };
+        // Pollinations AI - Completely free, no API key
+        async function generateWithPollinations(prompt) {
+            const encodedPrompt = encodeURIComponent(prompt);
+            const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&seed=${Math.floor(Math.random() * 1000000)}`;
+            
+            // Test if image loads
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(imageUrl);
+                img.onerror = () => reject(new Error('Failed to generate image'));
+                img.src = imageUrl;
+            });
+        }
+        
+        // Picsum - Random photos (fallback)
+        function generateWithPicsum(prompt) {
+            const seed = prompt.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            return `https://picsum.photos/seed/${seed}/512/512`;
+        }
+        
+        // Hugging Face API (requires free API key)
+        // Get free API key from huggingface.co
+        const HF_API_KEY = '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';
+        async function generateWithHuggingFace(prompt, apiKey) {
+            const response = await fetch('https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    inputs: prompt,
+                    parameters: {
+                        guidance_scale: 7.5,
+                        num_inference_steps: 50
+                    }
+                })
+            });
+            
+            if (!response.ok) throw new Error('Hugging Face API error');
+            
+            const blob = await response.blob();
+            return URL.createObjectURL(blob);
+        }
+        
+// ...existing code...
+
+// ...existing code...
+
+async function generateText(prompt, output) {
+    // Static text generation based on prompt keywords
+    if (prompt.toLowerCase().includes("slogan") && prompt.toLowerCase().includes("hustle")) {
+        output.textContent = "Hustle Hard, Dream Big!";
+    } else if (prompt.toLowerCase().includes("story")) {
+        output.textContent = "Once upon a time, in a world fueled by curiosity, a young explorer set out to discover the secrets of the universe...";
+    } else {
+        output.textContent = "This is a sample generated text based on your prompt: " + prompt;
+    }
+}
+
+async function generateCode(prompt, output) {
+    // Static code generation based on prompt keywords
+    if (prompt.toLowerCase().includes("sort") && prompt.toLowerCase().includes("array")) {
+        output.textContent = `function sortArray(arr) {
+    return arr.sort((a, b) => a - b);
+}`;
+    } else if (prompt.toLowerCase().includes("hello world")) {
+        output.textContent = `console.log("Hello, World!");`;
+    } else {
+        output.textContent = "// Sample code generated for your prompt: " + prompt;
+    }
+}
+// ...existing code...}
+        // Initialize API key section visibility
+        document.getElementById('apiKeySection').style.display = 'none';    
+// ...existing code...
+        
+        // Initialize placeholder
+        updatePlaceholder();
+        
+        // Enter key support
+        document.getElementById('userInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                generateContent();
+            }
+        });
+    </script>
+</body>
+</html>
